@@ -3,6 +3,21 @@
 
 This is a Retrieval-Augmented Generation (RAG) project using Groq's LLM (like LLaMA3), LangChain, FAISS, and HuggingFace embeddings to answer questions based on custom PDFs.
 
+## Working :
+          ┌────────────┐
+          │  PDF Docs  │
+          └────┬───────┘
+               ▼
+     ┌──────────────────┐
+     │ Split + Embed    │ ← HuggingFace Embeddings
+     └────┬─────────────┘
+          ▼
+     ┌─────────────┐
+     │ Vector Store│ ← FAISS
+     └────┬────────┘
+          ▼
+User → [RAG Retriever] → [Top Chunks] → [LLM via MCP] → ✨ GenAI Answer
+
 ## 🚀 Features
 
 - Load and chunk PDF documents
@@ -78,6 +93,7 @@ Once the app starts, you can ask questions based on the content of `sample.pdf`.
 
 - Ensure your `sample.pdf` is placed in the `data/` folder.
 - You can change the LLM model in `rag_engine.py` (`llama3-8b-8192`, `mixtral-8x7b`, etc.).
+
 
 ## 📄 License
 
