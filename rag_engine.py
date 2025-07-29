@@ -1,40 +1,52 @@
-from langchain_community.vectorstores import FAISS
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import CharacterTextSplitter
+# rag_engine.py
+
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
+import os
 from langchain_community.embeddings import HuggingFaceEmbeddings
+
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
-from langchain.llms import HuggingFacePipeline
-from transformers import pipeline
 
-def get_rag_chain():
-    # Load PDF and split into documents
-    loader = PyPDFLoader("data/sample.pdf")
-    documents = loader.load()
+from dotenv import load_dotenv
+load_dotenv()
 
-    # Split text into chunks
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    docs = text_splitter.split_documents(documents)
-    print(f"✅ Loaded {len(docs)} chunks from data/sample.pdf")
+# Load PDF and split into chunks
+def load_and_split_pdf(pdf_path):
+    loader = PyPDFLoader(pdf_path)
+    pages = loader.load()
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    docs = splitter.split_documents(pages)
+    print(f"✅ Loaded {len(docs)} chunks from {pdf_path}")
+    return docs
 
-    # Create embeddings and vector store
+# Create FAISS vector store
+def create_vectorstore(docs):
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     vectorstore = FAISS.from_documents(docs, embeddings)
-    vectorstore.save_local("vector_store")
-    print("✅ Vector store saved to 'vector_store'")
+    return vectorstore
 
-    # Set up local Hugging Face LLM
-    qa_pipeline = pipeline(
-        "text-generation",
-        model="gpt2",  # You can replace this with a more powerful model if needed
-        max_length=512,
-        temperature=0.7,
-        top_k=50,
-        top_p=0.95,
-        repetition_penalty=1.2
+# Build RAG pipeline using Groq
+def get_rag_chain():
+    docs = load_and_split_pdf("data/sample.pdf")
+    vectorstore = create_vectorstore(docs)
+    retriever = vectorstore.as_retriever()
+
+    # Load Groq Chat LLM
+    llm = ChatGroq(
+        model="llama3-8b-8192",  # or use mixtral/gemma
+        temperature=0.3,
+        groq_api_key=os.environ.get("GROQ_API_KEY")
     )
 
-    llm = HuggingFacePipeline(pipeline=qa_pipeline)
-
-    # Set up RAG chain
-    rag_chain = RetrievalQA.from_chain_type(llm=llm, retriever=vectorstore.as_retriever())
-    return rag_chain
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        retriever=retriever,
+        return_source_documents=False
+    )
+    return qa_chain
